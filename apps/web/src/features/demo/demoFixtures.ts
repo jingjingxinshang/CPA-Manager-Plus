@@ -40,6 +40,7 @@ import type {
   CodexQuotaState,
   CredentialScopedQuotaState,
   DevinQuotaState,
+  HostQuotaState,
   KimiQuotaState,
   MetaQuotaState,
   XaiQuotaState,
@@ -67,6 +68,7 @@ export type DemoQuotaStoreState = {
   claudeQuota: Record<string, ClaudeQuotaState>;
   codexQuota: Record<string, CodexQuotaState>;
   devinQuota: Record<string, DevinQuotaState>;
+  hostQuota: Record<string, HostQuotaState>;
   kimiQuota: Record<string, KimiQuotaState>;
   metaQuota: Record<string, MetaQuotaState>;
   xaiQuota: Record<string, XaiQuotaState>;
@@ -6200,6 +6202,7 @@ const getDemoQuotaStoreStateByFileName = (
   baseNow = getDemoEvidenceEpochMs()
 ): DemoQuotaStoreState => ({
   metaQuota: {},
+  hostQuota: {},
   codexQuota: {
     'codex-team-01.json': {
       status: 'success',
@@ -6912,6 +6915,7 @@ export const getDemoQuotaStoreState = (baseNow = getDemoEvidenceEpochMs()): Demo
     claudeQuota: scopeDemoQuotaRecord(raw.claudeQuota, filesByName),
     codexQuota: scopeDemoQuotaRecord(raw.codexQuota, filesByName),
     devinQuota: scopeDemoQuotaRecord(raw.devinQuota, filesByName),
+    hostQuota: scopeDemoQuotaRecord(raw.hostQuota, filesByName),
     kimiQuota: scopeDemoQuotaRecord(raw.kimiQuota, filesByName),
     metaQuota: scopeDemoQuotaRecord(raw.metaQuota, filesByName),
     xaiQuota: scopeDemoQuotaRecord(raw.xaiQuota, filesByName),

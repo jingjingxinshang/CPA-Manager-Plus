@@ -41,6 +41,7 @@ const CODEX_MAIN_SCOPE = { kind: 'family', key: 'codex_main', complete: true } a
 
 const emptyStores = (): AccountQuotaStores => ({
   antigravityQuota: {},
+  hostQuota: {},
   claudeQuota: {},
   codexQuota: {},
   kimiQuota: {},

@@ -2520,6 +2520,9 @@
     "loading": "正在加载额度...",
     "refresh_button": "刷新额度"
   },
+  "host_quota": {
+    "missing_auth_index": "该凭据缺少 auth_index"
+  },
   "vertex_import": {
     "title": "Vertex JSON 登录",
     "description": "上传 Google 服务账号 JSON，使用 CLI vertex-import 同步规则写入 auth-dir/vertex-<project>.json。",

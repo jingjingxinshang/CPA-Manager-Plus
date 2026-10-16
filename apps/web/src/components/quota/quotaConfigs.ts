@@ -9,6 +9,8 @@ import type {
   CredentialScopedQuotaState,
   DevinQuotaData,
   DevinQuotaState,
+  HostQuotaData,
+  HostQuotaState,
   KimiQuotaState,
   MetaQuotaData,
   MetaQuotaState,
@@ -31,6 +33,7 @@ import {
   fetchCodexQuota,
   fetchCodexQuotaSummary,
   fetchDevinQuota,
+  fetchHostQuota,
   fetchKimiQuota,
   fetchMetaQuota,
   fetchXaiQuota,
@@ -60,7 +63,15 @@ import {
   scopeQuotaStateToCredential,
 } from '@/utils/quota/credentialScope';
 
-type QuotaType = 'antigravity' | 'claude' | 'codex' | 'kimi' | 'xai' | 'devin' | 'meta';
+type QuotaType =
+  | 'antigravity'
+  | 'claude'
+  | 'codex'
+  | 'kimi'
+  | 'xai'
+  | 'devin'
+  | 'meta'
+  | 'host';
 
 export type { QuotaFetchContext };
 
@@ -666,6 +677,49 @@ export const ANTIGRAVITY_CONFIG: QuotaConfig<AntigravityQuotaState, AntigravityQ
   buildErrorState: (message, status, file) => ({
     status: 'error',
     groups: [],
+    subscription: null,
+    serverTimeOffsetMs: null,
+    error: message,
+    errorStatus: status,
+    ...buildQuotaCredentialIdentity(file),
+    failedAtMs: Date.now(),
+  }),
+  scopeState: scopeCredentialQuotaState,
+};
+
+/**
+ * Quota the host reports for a credential, for providers the panel has no
+ * dedicated config for. The host normalizes the payload, so this config only
+ * carries it into a state: no provider is named here, and a provider the host
+ * starts reporting quota for needs no change on this side.
+ */
+export const HOST_QUOTA_CONFIG: QuotaConfig<HostQuotaState, HostQuotaData> = {
+  type: 'host',
+  i18nPrefix: 'host_quota',
+  fetchQuota: fetchHostQuota,
+  getStoreKey: getQuotaCredentialStoreKey,
+  buildLoadingState: (file) => ({
+    status: 'loading',
+    groups: [],
+    summary: [],
+    subscription: null,
+    serverTimeOffsetMs: null,
+    ...buildQuotaCredentialIdentity(file),
+  }),
+  buildSuccessState: (data, file) => ({
+    status: 'success',
+    groups: data.groups,
+    summary: data.summary,
+    quotaInventoryObserved: data.quotaInventoryObserved,
+    subscription: data.subscription ?? null,
+    serverTimeOffsetMs: data.serverTimeOffsetMs ?? null,
+    ...buildQuotaCredentialIdentity(file),
+    fetchedAtMs: Date.now(),
+  }),
+  buildErrorState: (message, status, file) => ({
+    status: 'error',
+    groups: [],
+    summary: [],
     subscription: null,
     serverTimeOffsetMs: null,
     error: message,

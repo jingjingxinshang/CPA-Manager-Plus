@@ -385,6 +385,64 @@ export interface AntigravityQuotaState extends CredentialScopedQuotaState {
   errorStatus?: number;
 }
 
+/**
+ * Quota the host reports for a credential, normalized by the host itself.
+ *
+ * The host answers for any credential whose provider it has a quota source for,
+ * so these limits can be rendered without knowing the provider. `summary` holds
+ * provider-defined account totals and `groups` holds the limit windows.
+ */
+export interface HostQuotaBucket {
+  id: string;
+  label: string;
+  window?: string;
+  /** Remaining share of the limit, in the 0..1 range. */
+  remainingFraction: number;
+  /** Timestamp the bucket refills at, when the provider reports one. */
+  resetTime?: string;
+  description?: string;
+}
+
+export interface HostQuotaGroup {
+  id: string;
+  label: string;
+  description?: string;
+  buckets: HostQuotaBucket[];
+}
+
+export interface HostQuotaSubscription {
+  plan?: string | null;
+  tierName?: string | null;
+  tierId?: string | null;
+}
+
+/** A bounded numeric total the provider published for the credential. */
+export interface HostQuotaMetric {
+  key: string;
+  label: string;
+  value: number;
+  unit?: string;
+  format?: string;
+  currency?: string;
+}
+
+/** The normalized quota payload the host returns for one credential. */
+export interface HostQuotaData {
+  subscription?: HostQuotaSubscription | null;
+  summary: HostQuotaMetric[];
+  groups: HostQuotaGroup[];
+  /** Host clock minus this client's clock, when the host reports it. */
+  serverTimeOffsetMs?: number | null;
+  /** True once the host has reported any limit for the credential. */
+  quotaInventoryObserved?: boolean;
+}
+
+export interface HostQuotaState extends CredentialScopedQuotaState, HostQuotaData {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  error?: string;
+  errorStatus?: number;
+}
+
 export interface CodexQuotaWindow {
   id: string;
   label: string;

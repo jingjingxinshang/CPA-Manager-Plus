@@ -44,6 +44,7 @@ export type AccountQuotaWindowSource =
   | 'claude'
   | 'antigravity'
   | 'devin'
+  | 'host'
   | 'kimi'
   | 'meta'
   | 'xai'
@@ -170,7 +171,9 @@ export const getAccountQuotaSemanticGroup = (
 
 const normalizeText = (value: string): string => value.trim().toLowerCase().replace(/\s+/g, ' ');
 
-const parseAntigravityWindowSeconds = (value: string | undefined): number | null => {
+// Provider-agnostic: the same spellings appear in any provider's window field,
+// so this is shared rather than duplicated per provider.
+const parseQuotaWindowSeconds = (value: string | undefined): number | null => {
   const normalized = value?.trim().toLowerCase().replace(/_/g, '-') ?? '';
   if (['5h', '5-hour', 'five-hour'].includes(normalized)) return 5 * 60 * 60;
   if (['24h', 'daily', 'day'].includes(normalized)) return 24 * 60 * 60;
@@ -595,7 +598,7 @@ const buildAntigravityQuotaDisplayWindows = (
         resetLabel: formatDisplayResetTime(bucket.resetTime),
         resetAtMs: reset.resetAtMs,
         resetAccuracy: reset.resetAccuracy,
-        limitWindowSeconds: parseAntigravityWindowSeconds(bucket.window),
+        limitWindowSeconds: parseQuotaWindowSeconds(bucket.window),
         description,
         groupLabel,
         modelScope: buildAntigravityWindowModelScope(group.id, group.label, group.models),
@@ -826,6 +829,48 @@ const buildSummaryQuotaDisplayWindow = (
   ];
 };
 
+/**
+ * Windows for the quota the host reports for one credential.
+ *
+ * Labels and window spellings come from the provider through the host, so they
+ * are shown as reported rather than translated: this panel has no label table
+ * for a provider it does not implement itself.
+ */
+const buildHostQuotaDisplayWindows = (
+  row: AccountRow,
+  options: BuildAccountQuotaDisplayWindowsOptions
+): AccountQuotaDisplayWindow[] => {
+  const quota = getCredentialScopedQuotaState(options.stores.hostQuota, row.raw);
+  const groups = quota?.groups ?? [];
+  return groups.flatMap((group) =>
+    group.buckets.map((bucket) => {
+      const reset = resolveAbsoluteQuotaReset(bucket.resetTime);
+      const remainingPercent = clampDisplayPercent(bucket.remainingFraction * 100);
+      const label = bucket.label || bucket.id;
+      const kind =
+        inferAccountQuotaWindowKind({ key: bucket.window ?? '', label }) ??
+        inferAccountQuotaWindowKind({ key: bucket.id, label }) ??
+        undefined;
+      return buildAccountQuotaDisplayWindow({
+        key: `${group.id}:${bucket.id}`,
+        label,
+        kind,
+        remainingPercent,
+        usedPercent: clampDisplayPercent(100 - remainingPercent),
+        resetLabel: formatDisplayResetTime(bucket.resetTime),
+        resetAtMs: reset.resetAtMs,
+        resetAccuracy: reset.resetAccuracy,
+        limitWindowSeconds: parseQuotaWindowSeconds(bucket.window),
+        description: bucket.description ?? group.description,
+        groupLabel: group.label,
+        source: 'host',
+        observedAtMs: quota?.fetchedAtMs ?? null,
+        nowMs: options.nowMs,
+      });
+    })
+  );
+};
+
 export const buildAccountQuotaDisplayWindows = (
   row: AccountRow,
   options: BuildAccountQuotaDisplayWindowsOptions
@@ -864,6 +909,13 @@ export const buildAccountQuotaDisplayWindows = (
     const windows = buildMetaQuotaDisplayWindows(row, options);
     if (windows.length) return windows;
   }
+
+  // Quota the host reports for a credential whose provider has no builder here.
+  // The host normalizes the payload, so a provider this panel does not
+  // implement still shows its limits. A credential with no host reading keeps
+  // the summary window below.
+  const hostWindows = buildHostQuotaDisplayWindows(row, options);
+  if (hostWindows.length) return hostWindows;
 
   return buildSummaryQuotaDisplayWindow(row, options);
 };

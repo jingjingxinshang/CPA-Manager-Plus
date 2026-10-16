@@ -24,6 +24,7 @@ import { accountWindowUsageRequestKey } from './accountWindowUsageRows';
 
 const emptyStores = (): AccountQuotaStores => ({
   antigravityQuota: {},
+  hostQuota: {},
   claudeQuota: {},
   codexQuota: {},
   devinQuota: {},
@@ -59,6 +60,7 @@ const buildRow = (file: AuthFileItem, stores: AccountQuotaStores = emptyStores()
     stores.claudeQuota,
     stores.codexQuota,
     stores.devinQuota,
+    stores.hostQuota,
     stores.kimiQuota,
     stores.metaQuota,
     stores.xaiQuota,
@@ -431,6 +433,129 @@ describe('accountQuotaDisplayWindows', () => {
       quotaProgressObservedAtMs: 2_000,
     });
     expect(getAccountQuotaSemanticGroup(windows[1])).toBe('other');
+  });
+
+  it('renders the quota the host reports for a provider this build has no config for', () => {
+    const fetchedAtMs = Date.parse('2026-07-10T12:00:00Z');
+    const resetTime = new Date(fetchedAtMs).toISOString();
+    const stores = {
+      ...emptyStores(),
+      hostQuota: {
+        'custom.json': {
+          status: 'success',
+          fetchedAtMs,
+          subscription: null,
+          summary: [{ key: 'credits', label: 'Credits', value: 120 }],
+          groups: [
+            {
+              id: 'plan',
+              label: 'Plan limits',
+              buckets: [
+                {
+                  id: 'daily',
+                  label: 'Daily limit',
+                  window: '24h',
+                  remainingFraction: 0.25,
+                  resetTime,
+                  description: 'Rolling day',
+                },
+              ],
+            },
+          ],
+        },
+      },
+    } satisfies AccountQuotaStores;
+    const row = buildRow({ name: 'custom.json', type: 'custom-provider' }, stores);
+
+    const windows = buildAccountQuotaDisplayWindows(row, {
+      stores,
+      translateQuotaWindowLabel,
+      t,
+    });
+
+    expect(windows).toHaveLength(1);
+    expect(windows[0]).toMatchObject({
+      key: 'plan:daily',
+      label: 'Daily limit',
+      kind: 'daily',
+      remainingPercent: 25,
+      usedPercent: 75,
+      resetAtMs: fetchedAtMs,
+      resetAccuracy: 'exact',
+      limitWindowSeconds: 24 * 60 * 60,
+      description: 'Rolling day',
+      groupLabel: 'Plan limits',
+      source: 'host',
+      observedAtMs: fetchedAtMs,
+    });
+  });
+
+  it('keeps a provider this build implements ahead of the host reading', () => {
+    const stores = {
+      ...emptyStores(),
+      hostQuota: {
+        'claude.json': {
+          status: 'success',
+          subscription: null,
+          summary: [],
+          groups: [
+            {
+              id: 'host',
+              label: 'Host limits',
+              buckets: [{ id: 'host', label: 'Host limit', remainingFraction: 0.1 }],
+            },
+          ],
+        },
+      },
+      claudeQuota: {
+        'claude.json': {
+          status: 'success',
+          windows: [
+            {
+              id: 'seven_day',
+              label: 'Weekly limit',
+              usedPercent: 40,
+              resetLabel: '',
+            },
+          ],
+        },
+      },
+    } satisfies AccountQuotaStores;
+    const row = buildRow({ name: 'claude.json', type: 'claude' }, stores);
+
+    const windows = buildAccountQuotaDisplayWindows(row, {
+      stores,
+      translateQuotaWindowLabel,
+      t,
+    });
+
+    expect(windows).toHaveLength(1);
+    expect(windows[0]?.source).toBe('claude');
+  });
+
+  it('does not invent a window when the host reports no limits', () => {
+    const stores = {
+      ...emptyStores(),
+      hostQuota: {
+        'custom.json': {
+          status: 'success',
+          subscription: null,
+          summary: [],
+          groups: [],
+        },
+      },
+    } satisfies AccountQuotaStores;
+    const row = buildRow({ name: 'custom.json', type: 'custom-provider' }, stores);
+
+    const windows = buildAccountQuotaDisplayWindows(row, {
+      stores,
+      translateQuotaWindowLabel,
+      t,
+    });
+
+    // The row carries no quota either, so the view stays empty rather than
+    // showing a limit the host never reported.
+    expect(windows).toEqual([]);
   });
 
   it('flattens Antigravity groups while retaining group and bucket metadata', () => {

@@ -16,6 +16,7 @@ import {
 
 const emptyStores = (): AccountQuotaStores => ({
   antigravityQuota: {},
+  hostQuota: {},
   claudeQuota: {},
   codexQuota: {},
   kimiQuota: {},

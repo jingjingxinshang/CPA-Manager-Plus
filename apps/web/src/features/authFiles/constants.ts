@@ -162,8 +162,16 @@ export const normalizeProviderKey = (value: string) => {
   return key;
 };
 
-export const isQuotaRefreshSupportedProvider = (provider: string): boolean =>
-  QUOTA_PROVIDER_TYPES.has(normalizeProviderKey(provider) as QuotaProviderType);
+export const isQuotaRefreshSupportedProvider = (
+  provider: string,
+  hostProviderKeys?: ReadonlySet<string>
+): boolean => {
+  const providerKey = normalizeProviderKey(provider);
+  if (QUOTA_PROVIDER_TYPES.has(providerKey as QuotaProviderType)) return true;
+  // The host reports quota for providers this build has no config for, so they
+  // are supported too: the request goes to the host rather than to a config.
+  return Boolean(hostProviderKeys?.has(providerKey));
+};
 
 
 export const getEquivalentProviderKeys = (value: string): string[] => {

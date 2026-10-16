@@ -5,6 +5,7 @@ import type {
   CodexQuotaState,
   CodexSpendControlLimit,
   DevinQuotaState,
+  HostQuotaState,
   KimiQuotaState,
   MetaQuotaState,
   QuotaResetAccuracy,
@@ -78,6 +79,7 @@ export interface AccountQuotaStores {
   claudeQuota: Record<string, ClaudeQuotaState>;
   codexQuota: Record<string, CodexQuotaState>;
   devinQuota: Record<string, DevinQuotaState>;
+  hostQuota: Record<string, HostQuotaState>;
   kimiQuota: Record<string, KimiQuotaState>;
   metaQuota: Record<string, MetaQuotaState>;
   xaiQuota: Record<string, XaiQuotaState>;

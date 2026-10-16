@@ -2524,6 +2524,9 @@
     "loading": "Загрузка квоты...",
     "refresh_button": "Обновить квоту"
   },
+  "host_quota": {
+    "missing_auth_index": "В учетных данных отсутствует auth_index"
+  },
   "vertex_import": {
     "title": "Вход с Vertex JSON",
     "description": "Загрузите JSON ключа сервисного аккаунта Google, чтобы сохранить его как auth-dir/vertex-<project>.json по тем же правилам, что и помощник CLI vertex-import.",

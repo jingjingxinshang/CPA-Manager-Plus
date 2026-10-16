@@ -86,6 +86,21 @@ describe('authFiles constants - meta', () => {
     expect(isMetaFile({ name: 'codex.json', provider: 'codex' })).toBe(false);
   });
 
+  it('accepts a provider the host reports quota for, on top of the built-in set', () => {
+    const hostProviderKeys = new Set(['custom-provider', 'host-provided']);
+
+    expect(isQuotaRefreshSupportedProvider('custom-provider', hostProviderKeys)).toBe(true);
+    expect(isQuotaRefreshSupportedProvider('CUSTOM-PROVIDER', hostProviderKeys)).toBe(true);
+    expect(isQuotaRefreshSupportedProvider('host-provided', hostProviderKeys)).toBe(true);
+
+    // A host list does not make an unrelated provider refreshable, and an empty
+    // or missing list keeps the built-in behaviour.
+    expect(isQuotaRefreshSupportedProvider('other-provider', hostProviderKeys)).toBe(false);
+    expect(isQuotaRefreshSupportedProvider('other-provider', new Set())).toBe(false);
+    expect(isQuotaRefreshSupportedProvider('other-provider')).toBe(false);
+    expect(isQuotaRefreshSupportedProvider('codex', new Set())).toBe(true);
+  });
+
   it('correctly evaluates quota refresh eligibility via isQuotaRefreshSupportedProvider', () => {
     // Meta / Muse is quota-refreshable in phase 2
     expect(isQuotaRefreshSupportedProvider('meta')).toBe(true);

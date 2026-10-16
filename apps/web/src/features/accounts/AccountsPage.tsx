@@ -52,6 +52,7 @@ import {
   CODEX_CONFIG,
   CODEX_SUMMARY_CONFIG,
   DEVIN_CONFIG,
+  HOST_QUOTA_CONFIG,
   KIMI_CONFIG,
   META_CONFIG,
   XAI_CONFIG,
@@ -83,6 +84,7 @@ import {
   useCredentialInspectionSnapshot,
 } from '@/features/accounts/hooks/useCredentialInspectionSnapshot';
 import { useAccountsWorkspaceRefresh } from '@/features/accounts/hooks/useAccountsWorkspaceRefresh';
+import { useHostQuotaProviders } from '@/features/accounts/hooks/useHostQuotaProviders';
 import { useHeaderSnapshotsLoader } from '@/features/monitoring/hooks/useHeaderSnapshotsLoader';
 import { PaginationControls } from '@/features/monitoring/components/MonitoringShared';
 import { CredentialHealthInspectionWorkspace } from '@/features/monitoring/components/CredentialHealthInspectionWorkspace';
@@ -324,6 +326,8 @@ import type {
   CodexQuotaState,
   DevinQuotaData,
   DevinQuotaState,
+  HostQuotaData,
+  HostQuotaState,
   MetaQuotaData,
   MetaQuotaState,
   XaiQuotaState,
@@ -1373,6 +1377,7 @@ export function AccountsPage() {
   const claudeQuota = useQuotaStore((state) => state.claudeQuota);
   const codexQuota = useQuotaStore((state) => state.codexQuota);
   const devinQuota = useQuotaStore((state) => state.devinQuota);
+  const hostQuota = useQuotaStore((state) => state.hostQuota);
   const kimiQuota = useQuotaStore((state) => state.kimiQuota);
   const metaQuota = useQuotaStore((state) => state.metaQuota);
   const xaiQuota = useQuotaStore((state) => state.xaiQuota);
@@ -1382,19 +1387,24 @@ export function AccountsPage() {
       claudeQuota,
       codexQuota,
       devinQuota,
+      hostQuota,
       kimiQuota,
       metaQuota,
       xaiQuota,
     }),
-    [antigravityQuota, claudeQuota, codexQuota, devinQuota, kimiQuota, metaQuota, xaiQuota]
+    [antigravityQuota, claudeQuota, codexQuota, devinQuota, hostQuota, kimiQuota, metaQuota, xaiQuota]
   );
   const setAntigravityQuota = useQuotaStore((state) => state.setAntigravityQuota);
   const setClaudeQuota = useQuotaStore((state) => state.setClaudeQuota);
   const setCodexQuota = useQuotaStore((state) => state.setCodexQuota);
   const setDevinQuota = useQuotaStore((state) => state.setDevinQuota);
+  const setHostQuota = useQuotaStore((state) => state.setHostQuota);
   const setKimiQuota = useQuotaStore((state) => state.setKimiQuota);
   const setMetaQuota = useQuotaStore((state) => state.setMetaQuota);
   const setXaiQuota = useQuotaStore((state) => state.setXaiQuota);
+  // Providers the host reports quota for, on top of the ones this panel
+  // implements. Read once per connection and used by every quota gate below.
+  const hostQuotaProviderKeys = useHostQuotaProviders(authFilesRequestScope);
 
   const [activeView, setActiveView] = useState<AccountsView>(
     () => initialWorkspaceUrlState.current.view
@@ -6391,7 +6401,7 @@ export function AccountsPage() {
       row: AccountRow,
       mode: AccountQuotaRefreshMode = 'summary'
     ): Promise<AccountQuotaRefreshOutcome> => {
-      if (row.runtimeOnly || !isQuotaRefreshSupportedProvider(row.provider)) {
+      if (row.runtimeOnly || !isQuotaRefreshSupportedProvider(row.provider, hostQuotaProviderKeys)) {
         return { status: 'ignored' };
       }
       const refreshWithConfig = <TState, TData>(
@@ -6502,7 +6512,16 @@ export function AccountsPage() {
             )
           );
         default:
-          return { status: 'error', error: t('common.unknown_error') };
+          // The panel has no config for this provider, but the host may still
+          // report quota for it: ask the host before giving up, so a provider
+          // this build does not know about is not a dead end.
+          return toAccountQuotaRefreshOutcome(
+            await refreshWithConfig<HostQuotaState, HostQuotaData>(
+              HOST_QUOTA_CONFIG,
+              setHostQuota,
+              getScopedQuotaState(HOST_QUOTA_CONFIG, baseQuotaStores.hostQuota, row.raw)
+            )
+          );
       }
     },
     [
@@ -6511,12 +6530,14 @@ export function AccountsPage() {
       setClaudeQuota,
       setCodexQuota,
       setDevinQuota,
+      setHostQuota,
       setKimiQuota,
       setMetaQuota,
       setXaiQuota,
       t,
       authFilesRequestScope,
       baseQuotaStores,
+      hostQuotaProviderKeys,
     ]
   );
 
@@ -6527,7 +6548,7 @@ export function AccountsPage() {
         return currentBatch.promise;
       }
       const refreshable = targets.filter(
-        (row) => !row.runtimeOnly && isQuotaRefreshSupportedProvider(row.provider)
+        (row) => !row.runtimeOnly && isQuotaRefreshSupportedProvider(row.provider, hostQuotaProviderKeys)
       );
       if (refreshable.length === 0) {
         showNotification(t('accounts.no_refreshable_accounts'), 'warning');
@@ -6672,12 +6693,12 @@ export function AccountsPage() {
       quotaRefreshBatchRef.current = { connectionFingerprint, generation, promise: batchPromise };
       return batchPromise;
     },
-    [accountDisplayMode, connectionFingerprint, refreshQuotaForRow, showNotification, t]
+    [accountDisplayMode, connectionFingerprint, refreshQuotaForRow, showNotification, t, hostQuotaProviderKeys]
   );
 
   const refreshAccountQuota = useCallback(
     async (row: AccountRow, mode: AccountQuotaRefreshMode = 'summary'): Promise<void> => {
-      if (row.runtimeOnly || !isQuotaRefreshSupportedProvider(row.provider)) return;
+      if (row.runtimeOnly || !isQuotaRefreshSupportedProvider(row.provider, hostQuotaProviderKeys)) return;
       const refreshKey = getAccountQuotaRefreshKey(row);
       if (manualQuotaRefreshingKeysRef.current.has(refreshKey)) return;
 
@@ -6729,7 +6750,7 @@ export function AccountsPage() {
         }
       }
     },
-    [accountDisplayMode, connectionFingerprint, refreshQuotaForRow, showNotification, t]
+    [accountDisplayMode, connectionFingerprint, refreshQuotaForRow, showNotification, t, hostQuotaProviderKeys]
   );
 
   const isManualQuotaRefreshing = (row: AccountRow): boolean =>
@@ -8203,7 +8224,7 @@ export function AccountsPage() {
     const hasSelection = selectionCount > 0;
     const refreshTargets = hasSelection ? selectedRows : pageRows;
     const hasRefreshableTargets = refreshTargets.some(
-      (row) => !row.runtimeOnly && isQuotaRefreshSupportedProvider(row.provider)
+      (row) => !row.runtimeOnly && isQuotaRefreshSupportedProvider(row.provider, hostQuotaProviderKeys)
     );
     const showSelectionControls = isSelectionMode || hasSelection;
 
@@ -8367,7 +8388,7 @@ export function AccountsPage() {
                 disableControls ||
                 quotaRefreshing ||
                 !selectedRows.some(
-                  (row) => !row.runtimeOnly && isQuotaRefreshSupportedProvider(row.provider)
+                  (row) => !row.runtimeOnly && isQuotaRefreshSupportedProvider(row.provider, hostQuotaProviderKeys)
                 )
               }
               loading={quotaRefreshing}
@@ -8450,7 +8471,7 @@ export function AccountsPage() {
       targetRow.provider === CODEX_CONFIG.type ? 'detail' : 'summary';
 
     const refreshButton =
-      !row.runtimeOnly && isQuotaRefreshSupportedProvider(row.provider) ? (
+      !row.runtimeOnly && isQuotaRefreshSupportedProvider(row.provider, hostQuotaProviderKeys) ? (
         <Button
           variant="secondary"
           size="sm"
@@ -10073,7 +10094,7 @@ export function AccountsPage() {
                 {t('accounts.recommend_action_reauth')}
               </Button>
             ) : null}
-            {!selectedRow.runtimeOnly && isQuotaRefreshSupportedProvider(selectedRow.provider) ? (
+            {!selectedRow.runtimeOnly && isQuotaRefreshSupportedProvider(selectedRow.provider, hostQuotaProviderKeys) ? (
               <Button
                 variant="secondary"
                 onClick={() => void refreshAccountQuota(selectedRow, 'detail')}

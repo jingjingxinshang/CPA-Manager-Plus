@@ -2520,6 +2520,9 @@
     "loading": "正在載入配額...",
     "refresh_button": "重新整理配額"
   },
+  "host_quota": {
+    "missing_auth_index": "該憑證缺少 auth_index"
+  },
   "vertex_import": {
     "title": "Vertex JSON 登入",
     "description": "上傳 Google 服務帳號 JSON，使用 CLI vertex-import 同步規則寫入 auth-dir/vertex-<project>.json。",

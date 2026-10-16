@@ -503,6 +503,7 @@ describe('useQuotaStore persistence', () => {
       claudeQuota: {},
       codexQuota: {},
       devinQuota: {},
+      hostQuota: {},
       kimiQuota: {},
       metaQuota: {},
       xaiQuota: {},
